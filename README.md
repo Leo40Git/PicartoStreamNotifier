@@ -1,0 +1,2 @@
+# PicartoStreamNotifier
+Python script that notifies when a Picarto creator goes live via Discord webhooks.

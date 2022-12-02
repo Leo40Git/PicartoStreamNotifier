@@ -196,7 +196,28 @@ if __name__ == '__main__':
         except KeyError:
             serverWebhookUrl = ""
         if len(serverWebhookUrl.strip()) <= 0:
-            log(f"Server \"{serverName}\" is missing webhook URL, skipping")
+            log(f"Server \"{serverName}\" - missing webhook URL, skipping")
+            continue
+        
+        serverCreators: list[str] = []
+        
+        serverCreatorData = None
+        try:
+            serverCreatorData = serverData['creators']
+        except KeyError:
+            log(f"Server \"{serverName}\" - missing creator list, skipping")
+            continue
+         
+        if isinstance(serverCreatorData, list):
+           for i, data in enumerate(serverCreatorData):
+                if isinstance(data, str):
+                    serverCreators.append(data)
+                else:
+                    log(f"Server \"{serverName}\" - invalid creator name {data}")
+        elif isinstance(serverCreatorData, str):
+            serverCreators.append(serverCreatorData)
+        else:
+            log(f"Server \"{serverName}\" - invalid creator list {serverCreatorData}, skipping")
             continue
 
         serverPings: list[DiscordPing] = []
@@ -205,7 +226,7 @@ if __name__ == '__main__':
         try:
             serverPingData = serverData['pings']
         except KeyError:
-            log(f"Server \"{serverName}\" is missing ping configuration, defaulting to @everyone'")
+            log(f"Server \"{serverName}\" - missing ping configuration, defaulting to @everyone'")
             serverPings.append(EVERYONE_PING)
 
         if isinstance(serverPingData, list):
@@ -222,7 +243,7 @@ if __name__ == '__main__':
         
         server = DiscordServer(serverName, serverWebhookUrl, serverPings)
 
-        for creatorName in serverData['creators']:
+        for creatorName in serverCreators:
             server.add_creator(creatorName)
         
         servers.append(server)

@@ -118,7 +118,7 @@ class DiscordServer:
 
         for creator in self._creators.values():
             if creator.id not in self._seenCreators and creator.id in onlineCreators:
-                requests.post(self._webhookUrl, { "content": f"{self._pingStr}{str(creator)} is now online!\nhttps://picarto.tv/{str(creator)}" }, timeout = 10)
+                requests.post(self._webhookUrl, { "content": f"{self._pingStr} {str(creator)} is now online!\nhttps://picarto.tv/{str(creator)}" }, timeout = 10)
                 self._seenCreators.append(creator.id)
                 log(f"Server '{self._name}' - {str(creator)} online!")
 

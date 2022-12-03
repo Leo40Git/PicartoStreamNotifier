@@ -252,7 +252,7 @@ if __name__ == '__main__':
     print()
     
     if serverIndex == 0:
-        log('No configured servers.')
+        log('No configured servers. Exiting...')
         exit(0)
     
     serverList = f"{serverIndex} configured server(s):"
@@ -262,6 +262,7 @@ if __name__ == '__main__':
         serverList += f"\n    {len(server.creators)} creator(s): {', '.join(map(str, server.creators))}"
         serverList += f"\n    {len(server.pings)} ping(s): {', '.join(map(repr, server.pings))}"
     log(serverList)
+    print()
 
     while True:
         success: bool = True

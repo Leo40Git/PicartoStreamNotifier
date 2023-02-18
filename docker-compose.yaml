@@ -1,0 +1,7 @@
+version: "3"
+services:
+  SMARollingScraper:
+    image: ghcr.io/leo40git/picartostreamnotifier:latest
+    container_name: picarto-stream-notifier
+
+    restart: always

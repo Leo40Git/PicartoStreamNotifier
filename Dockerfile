@@ -2,11 +2,8 @@
 
 FROM python:3.10-slim-buster
 
-WORKDIR /app
+ADD picartonotif.py /
 
-COPY requirements.txt requirements.txt
-RUN pip3 install -r requirements.txt
-
-COPY . .
+RUN pip3 install requests 2.28.1
 
 CMD [ "python3", "picartonotif.py" ]

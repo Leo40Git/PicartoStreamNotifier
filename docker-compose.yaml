@@ -5,7 +5,7 @@ services:
     container_name: picarto-stream-notifier
     configs:
       - source: servers_config
-        target: /
+        target: /app/
 
     restart: always
 

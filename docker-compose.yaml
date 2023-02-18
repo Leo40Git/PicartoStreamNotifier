@@ -3,5 +3,12 @@ services:
   PicartoStreamNotifier:
     image: ghcr.io/leo40git/picartostreamnotifier:latest
     container_name: picarto-stream-notifier
+    configs:
+      - source: servers_config
+        target: /
 
     restart: always
+
+configs:
+  servers_config:
+    file: ./servers.json

@@ -1,10 +1,10 @@
-name: Build & Publish (master)
+name: Build & Publish (root)
 
 on:
   push:
-    branches: [ master ]
+    branches: [ root ]
 #  pull_request:
-#    branches: [ master ]
+#    branches: [ root ]
   workflow_dispatch:
 
 jobs:

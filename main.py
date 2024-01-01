@@ -7,8 +7,6 @@ from typing import TypedDict, Literal, NewType, Final, Optional
 
 import requests
 
-from structures import CaselessDict, CaselessSet
-
 CONFIG_URL_ENV: Final[str] = 'PICARTOSTREAMNOTIFIER_CONFIG_URL'
 
 # region Configuration types
@@ -123,33 +121,41 @@ class PicartoCreator:
 
         return ret
 
+    def __str__(self):
+        return self.name
+
 
 class DiscordServer:
     name: Final[str]
     webhook_url: Final[str]
-    creators: CaselessDict[PicartoCreator]
+    creators: dict[str, PicartoCreator]
 
     # key is creator name
-    last_notify_timestamps: CaselessDict[datetime]
+    last_notify_timestamps: dict[str, datetime]
 
     def __init__(self, name: str, config: DiscordServerConfig):
         self.name = name
         self.webhook_url = config['webhook_url']
-        self.creators = CaselessDict()
-        self.last_notify_timestamps = CaselessDict()
+        self.creators = dict()
+        self.last_notify_timestamps = dict()
 
         self.update_config(config)
 
     def update_config(self, config: DiscordServerConfig):
-        removed_creators = set(self.creators.keys()) - set(config['creators'].keys())
+        new_creators: dict[str, PicartoCreator] = dict()
+        for (c_name, c_config) in config['creators'].items():
+            new_creators[c_name.casefold()] = PicartoCreator(c_name, c_config)
+
+        removed_creators = set(self.creators.keys()) - set(new_creators.keys())
 
         self.creators.clear()
-        for (c_name, c_config) in config['creators'].items():
-            self.creators[c_name] = PicartoCreator(c_name, c_config)
+        self.creators.update(new_creators)
 
         for creator in removed_creators:
-            if creator in self.last_notify_timestamps:
-                del self.last_notify_timestamps[creator]
+            self.last_notify_timestamps.pop(creator, None)
+
+    def __str__(self):
+        return self.name
 
 
 def log_timestamp(timestamp: datetime) -> str:
@@ -178,14 +184,14 @@ class Notifier:
 
     user_agent: str
     email: str
-    servers: CaselessDict[DiscordServer]
-    tracked_creators: CaselessSet
+    servers: dict[str, DiscordServer]
+    tracked_creators: set[str]
 
     def __init__(self, config_url: str):
         self.config_url = config_url
 
-        self.servers = CaselessDict()
-        self.tracked_creators = CaselessSet()
+        self.servers = dict()
+        self.tracked_creators = set()
 
     def run(self):
         self.update_config()
@@ -210,15 +216,19 @@ class Notifier:
         self.user_agent = self.config['user_agent']
         self.email = self.config['email']
 
-        removed_servers = set(self.servers.keys()) - set(self.config['servers'].keys())
+        new_servers: dict[str, tuple[str, DiscordServerConfig]] = dict()
+        for (s_name, s_config) in self.config['servers'].items():
+            new_servers[s_name.casefold()] = (s_name, s_config)
+
+        removed_servers = set(self.servers.keys()) - set(new_servers.keys())
 
         self.tracked_creators.clear()
 
-        for (s_name, s_config) in self.config['servers'].items():
+        for (s_name, s_config) in new_servers.items():
             if s_name in self.servers:
-                self.servers[s_name].update_config(s_config)
+                self.servers[s_name].update_config(s_config[1])
             else:
-                self.servers[s_name] = DiscordServer(s_name, s_config)
+                self.servers[s_name] = DiscordServer(s_config[0], s_config[1])
 
             for creator in self.servers[s_name].creators:
                 self.tracked_creators.add(creator)

@@ -88,7 +88,7 @@ class PicartoCreator:
                     self.ping_here = True
                     continue
 
-            # TODO
+            # TODO report this error better (in validate_config, maybe?)
             log(f'PicartoCreatorConfig.pings contains invalid value "{ping}", ignoring')
 
     def create_webhook_post_json(self, data: dict[str, Any]) -> dict[str, Any]:
@@ -136,10 +136,38 @@ class PicartoCreator:
         return result
 
     def _create_embed_dict(self, data: dict[str, Any]) -> dict[str, Any]:
-        # TODO
+        footer_parts: list[str] = list()
+
+        if data['adult']:
+            footer_parts.append('**NSFW**')
+
+        if data['gaming']:
+            footer_parts.append('Gaming')
+
+        footer_parts.append(data['category'])
+        footer_parts.append(', '.join(data['tags']))
+
         return {
-            'title': f'{self.name} is now online!',
-            'url': f'https://picarto.tv/{self.name}'
+            'title': data['title'],
+            'url': f'https://picarto.tv/{self.name}',
+            'color': 0x4C90F3,
+            'author': {'name': self.name},
+            'image': {
+                # TODO add timestamp to URL
+                'url': data['thumbnails']['web']
+            },
+            'fields': [
+                # TODO prettier number formatting
+                {'name': 'Followers', 'value': str(data['followers'])},
+                {'name': 'Total views', 'values': str(data['views_total'])}
+            ],
+            'thumbnail': {
+                # TODO add timestamp to URL
+                'url': data['avatar']
+            },
+            'footer': {
+                'text': ' | '.join(footer_parts)
+            }
         }
 
 

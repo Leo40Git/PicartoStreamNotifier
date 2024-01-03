@@ -22,12 +22,12 @@ class PicartoCreatorConfig(TypedDict):
     pings: Sequence[DiscordPing]
 
 
-class DiscordServerConfig(TypedDict):
-    webhook_url: str
+class DiscordWebhookConfig(TypedDict):
+    url: str
     creators: Mapping[str, PicartoCreatorConfig]
 
 
 class NotifierConfig(TypedDict):
     user_agent: str
     email: str
-    servers: Mapping[str, DiscordServerConfig]
+    webhooks: Mapping[str, DiscordWebhookConfig]

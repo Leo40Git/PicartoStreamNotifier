@@ -171,9 +171,9 @@ class PicartoCreator:
         }
 
 
-class DiscordServer:
+class DiscordWebhook:
     name: str
-    webhook_url: str
+    url: str
     creators: dict[str, PicartoCreator]
 
     # last time the creator went live, as reported by Picarto
@@ -182,16 +182,16 @@ class DiscordServer:
     # last time we pushed a notification to the webhook
     last_notified: dict[str, datetime]
 
-    def __init__(self, name: str, config: DiscordServerConfig):
+    def __init__(self, name: str, config: DiscordWebhookConfig):
         self.creators = {}
         self.last_live = {}
         self.last_notified = {}
 
         self.update_config(name, config)
 
-    def update_config(self, name: str, config: DiscordServerConfig):
+    def update_config(self, name: str, config: DiscordWebhookConfig):
         self.name = name
-        self.webhook_url = config['webhook_url']
+        self.url = config['url']
 
         removed_creators: set[str] = set(self.creators.keys())
         removed_creators.update(self.last_notified.keys())
@@ -225,14 +225,14 @@ class DiscordServer:
 
             creator = self.creators[c_key]
             try:
-                requests.post(self.webhook_url,
+                requests.post(self.url,
                               json=creator.create_webhook_post_json(c_data),
                               timeout=10).raise_for_status()
                 self.last_notified[c_key] = now
-                log(f'Server "{self.name}" sent notification for creator "{creator.name}"')
+                log(f'Webhook "{self.name}" sent notification for creator "{creator.name}"')
             except requests.exceptions.RequestException as exc:
                 log_exception(
-                    f'Server "{self.name}" failed to send notification for creator "{creator.name}":',
+                    f'Webhook "{self.name}" failed to send notification for creator "{creator.name}":',
                     exc)
                 any_errors = True
 
@@ -247,14 +247,14 @@ class Notifier:
 
     user_agent: str
     email: str
-    servers: dict[str, DiscordServer]
+    webhooks: dict[str, DiscordWebhook]
     tracked_creators: dict[str, str]
 
     def __init__(self, config_url: str):
         self.config_url = config_url
         self.config_update_interval = CONFIG_UPDATE_INTERVAL
 
-        self.servers = {}
+        self.webhooks = {}
         self.tracked_creators = {}
 
     def run(self):
@@ -291,20 +291,24 @@ class Notifier:
                     for i, data in enumerate(response):
                         if not isinstance(data, dict):
                             log(f"Unexpected API response (expected 'dict' at [{i}], got '{repr(data)}')")
+                            success = False
                             continue
 
                         if 'name' not in data:
                             log(f"Unexpected API response (dict at index {i} missing key 'name')")
+                            success = False
                             continue
 
                         creator_name = data.pop('name')
                         if not isinstance(creator_name, str):
                             log(f"Unexpected API response (expected 'str' at [{i}].name, got '{repr(creator_name)}')")
+                            success = False
+                            continue
 
                         online_creators[creator_name.casefold()] = data
 
-                    for server in self.servers.values():
-                        if not server.notify(online_creators):
+                    for webhook in self.webhooks.values():
+                        if not webhook.notify(online_creators):
                             success = False
 
                 if success:
@@ -334,25 +338,25 @@ class Notifier:
         self.user_agent = self.config['user_agent']
         self.email = self.config['email']
 
-        removed_servers: set[str] = set(self.servers.keys())
+        removed_webhooks: set[str] = set(self.webhooks.keys())
 
-        for s_name, s_config in self.config['servers'].items():
-            key = s_name.casefold()
+        for w_name, w_config in self.config['webhooks'].items():
+            key = w_name.casefold()
 
-            if key in self.servers:
-                self.servers[key].update_config(s_name, s_config)
+            if key in self.webhooks:
+                self.webhooks[key].update_config(w_name, w_config)
             else:
-                self.servers[key] = DiscordServer(s_name, s_config)
+                self.webhooks[key] = DiscordWebhook(w_name, w_config)
 
-            removed_servers.discard(key)
+            removed_webhooks.discard(key)
 
-        for server in removed_servers:
-            self.servers.pop(server, None)
+        for webhook in removed_webhooks:
+            self.webhooks.pop(webhook, None)
 
         self.tracked_creators.clear()
 
-        for server in self.servers.values():
-            for creator_key, creator in server.creators.items():
+        for webhook in self.webhooks.values():
+            for creator_key, creator in webhook.creators.items():
                 self.tracked_creators[creator_key] = creator.name
 
         log('Updated configuration!')

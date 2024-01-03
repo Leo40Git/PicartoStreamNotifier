@@ -1,48 +1,14 @@
 import json
 import os
 import traceback
-from collections.abc import Mapping, Sequence
 from datetime import datetime
-from typing import TypedDict, Literal, NewType, Final, Optional
+from typing import Final, Optional
 
 import requests
 
+from structures import *
+
 CONFIG_URL_ENV: Final[str] = 'PICARTOSTREAMNOTIFIER_CONFIG_URL'
-
-# region Configuration types
-DiscordSnowflake = NewType('DiscordSnowflake', int)
-
-DiscordEveryonePing = Literal['@everyone']
-DiscordHerePing = Literal['@here']
-
-
-class DiscordUserPing(TypedDict):
-    user: DiscordSnowflake
-
-
-class DiscordRolePing(TypedDict):
-    role: DiscordSnowflake
-
-
-DiscordPing = DiscordEveryonePing | DiscordHerePing | DiscordUserPing | DiscordRolePing
-
-
-class PicartoCreatorConfig(TypedDict):
-    pings: Sequence[DiscordPing]
-
-
-class DiscordServerConfig(TypedDict):
-    webhook_url: str
-    creators: Mapping[str, PicartoCreatorConfig]
-
-
-class NotifierConfig(TypedDict):
-    user_agent: str
-    email: str
-    servers: Mapping[str, DiscordServerConfig]
-
-
-# endregion
 
 
 class PicartoCreator:

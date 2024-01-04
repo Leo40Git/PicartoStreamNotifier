@@ -1,10 +1,21 @@
-from collections.abc import Mapping, Sequence
-from typing import TypedDict, Literal, NewType
+from typing import TypedDict, NewType, Literal, Mapping, Sequence
+
+__all__ = (
+    'DiscordSnowflake',
+    'DiscordEveryonePing',
+    'DiscordHerePing',
+    'DiscordUserPing',
+    'DiscordRolePing',
+    'DiscordPing',
+    'PicartoCreatorConfig',
+    'DiscordWebhookConfig',
+    'NotifierConfig',
+)
 
 DiscordSnowflake = NewType('DiscordSnowflake', int)
 
-DiscordEveryonePing = Literal['@everyone']
-DiscordHerePing = Literal['@here']
+DiscordEveryonePing = Literal['@everyone', 'everyone']
+DiscordHerePing = Literal['@here', 'here']
 
 
 class DiscordUserPing(TypedDict):

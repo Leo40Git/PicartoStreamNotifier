@@ -46,13 +46,19 @@ def log_exception(message: str, exc: Exception, timestamp: Optional[datetime] = 
     traceback.print_exception(exc, file=sys.stdout)
 
 
+def timestamp_url(url: str) -> str:
+    # TODO
+    return url
+
+
 def validate_config(config: NotifierConfig) -> bool:
     # TODO
     return True
 
 
 class PicartoCreator:
-    name: str
+    __name: str                   # as defined by configuration
+    __actual_name: Optional[str]  # as defined by Picarto
     ping_everyone: bool
     ping_here: bool
     ping_roles: set[DiscordSnowflake]
@@ -62,6 +68,16 @@ class PicartoCreator:
         self.ping_roles = set()
         self.ping_users = set()
         self.update_config(name, config)
+
+    @property
+    def name(self) -> str:
+        return self.__actual_name or self.__name
+
+    @name.setter
+    def name(self, name: str):
+        if name.casefold() != self.__name.casefold():
+            self.__name = name
+            self.__actual_name = None
 
     def update_config(self, name: str, config: PicartoCreatorConfig):
         self.name = name
@@ -92,6 +108,10 @@ class PicartoCreator:
             log(f'PicartoCreatorConfig.pings contains invalid value "{ping}", ignoring')
 
     def create_webhook_post_json(self, data: dict[str, Any]) -> dict[str, Any]:
+        if 'name' in data:
+            # update proper casing of name from Picarto
+            self.__actual_name = data['name']
+
         return {
             'content': self._create_message_content(),
             'embeds': [self._create_embed_dict(data)],
@@ -136,39 +156,50 @@ class PicartoCreator:
         return result
 
     def _create_embed_dict(self, data: dict[str, Any]) -> dict[str, Any]:
-        footer_parts: list[str] = list()
-
-        if data['adult']:
-            footer_parts.append('**NSFW**')
-
-        if data['gaming']:
-            footer_parts.append('Gaming')
-
-        footer_parts.append(data['category'])
-        footer_parts.append(', '.join(data['tags']))
-
-        return {
-            'title': data['title'],
+        embed: dict[str, Any] = {
             'url': f'https://picarto.tv/{self.name}',
             'color': 0x4C90F3,
             'author': {'name': self.name},
-            'image': {
-                # TODO add timestamp to URL
-                'url': data['thumbnails']['web']
-            },
-            'fields': [
-                # TODO prettier number formatting
-                {'name': 'Followers', 'value': str(data['followers'])},
-                {'name': 'Total views', 'values': str(data['views_total'])}
-            ],
-            'thumbnail': {
-                # TODO add timestamp to URL
-                'url': data['avatar']
-            },
-            'footer': {
-                'text': ' | '.join(footer_parts)
-            }
         }
+
+        if 'title' in data:
+            embed['title'] = data['title']
+        else:
+            embed['title'] = f"{self.name}'s Picarto Stream"
+
+        fields: list[dict[str, Any]] = []
+
+        if 'followers' in data:
+            fields.append({'name': 'Followers', 'value': str(data['followers'])})
+
+        if 'views_total' in data:
+            fields.append({'name': 'Total views', 'value': str(data['views_total'])})
+
+        if len(fields) > 0:
+            embed['fields'] = fields
+
+        if 'avatar' in data:
+            embed['thumbnail'] = {'url': timestamp_url(data['avatar'])}
+
+        tn_data = data.get('thumbnails')
+        if isinstance(tn_data, dict) and 'web' in tn_data:
+            embed['image'] = {'url': timestamp_url(tn_data['web'])}
+
+        footer_parts: list[str] = []
+
+        if data.get('adult', False):
+            footer_parts.append('**NSFW**')
+
+        if data.get('adult', False):
+            footer_parts.append('Gaming')
+
+        if 'category' in data:
+            footer_parts.append(data['category'])
+
+        if len(footer_parts) > 0:
+            embed['footer'] = {'text': ' | '.join(footer_parts)}
+
+        return embed
 
 
 class DiscordWebhook:
@@ -176,15 +207,11 @@ class DiscordWebhook:
     url: str
     creators: dict[str, PicartoCreator]
 
-    # last time the creator went live, as reported by Picarto
-    last_live: dict[str, datetime]
-
     # last time we pushed a notification to the webhook
     last_notified: dict[str, datetime]
 
     def __init__(self, name: str, config: DiscordWebhookConfig):
         self.creators = {}
-        self.last_live = {}
         self.last_notified = {}
 
         self.update_config(name, config)
@@ -299,7 +326,7 @@ class Notifier:
                             success = False
                             continue
 
-                        creator_name = data.pop('name')
+                        creator_name = data.get('name')
                         if not isinstance(creator_name, str):
                             log(f"Unexpected API response (expected 'str' at [{i}].name, got '{repr(creator_name)}')")
                             success = False

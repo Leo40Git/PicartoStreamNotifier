@@ -317,9 +317,9 @@ class PicartoCreator:
         footer_parts: list[str] = []
 
         if data.get('adult', False):
-            footer_parts.append('**NSFW**')
+            footer_parts.append('Mature Content (NSFW)')
 
-        if data.get('adult', False):
+        if data.get('gaming', False):
             footer_parts.append('Gaming')
 
         if 'category' in data:

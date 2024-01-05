@@ -474,7 +474,7 @@ class Notifier:
 
     def update_config(self,
                       *, indent: str = '') -> bool:
-        log(f'{indent}Fetching latest configuration')
+        log(f'{indent}Fetching latest configuration from "{self.config_url}"')
         new_config: NotifierConfig
         try:
             new_config = requests.get(self.config_url, timeout=10).json()

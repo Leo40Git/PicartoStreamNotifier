@@ -31,7 +31,7 @@ def log_timestamp(timestamp: datetime) -> str:
 
 def log(message: str, timestamp: Optional[datetime] = None):
     if timestamp is None:
-        timestamp = datetime.now()
+        timestamp = datetime.now(timezone.utc)
     print(f"[{log_timestamp(timestamp)}] {message}")
 
 

@@ -1,6 +1,7 @@
+import logging
+import logging.handlers
 import os
 import sys
-import traceback
 from collections.abc import Sequence, Mapping
 from datetime import datetime, timezone, timedelta
 from time import sleep
@@ -29,22 +30,27 @@ CHECK_INTERVAL_ERROR: Final[timedelta] = timedelta(minutes=1)
 NOTIFY_INTERVAL: Final[timedelta] = timedelta(minutes=30)
 
 
-def log_timestamp(timestamp: datetime) -> str:
-    return timestamp.strftime('%m/%d/%Y %H:%M')
+def _create_logger() -> logging.Logger:
+    fmt = logging.Formatter('[{asctime}] [{levelname:8}] {message}',
+                            datefmt='%m/%d/%Y %H:%M',
+                            style='{')
+    h_err = logging.StreamHandler(sys.stderr)
+    h_err.setFormatter(fmt)
+    h_err.setLevel(logging.INFO)
+
+    h_file = logging.handlers.RotatingFileHandler('picartonotif.log', maxBytes=2 ** 15,
+                                                  backupCount=9)
+    h_file.setFormatter(fmt)
+    h_file.setLevel(logging.DEBUG)
+
+    _l = logging.getLogger('picartonotif')
+    _l.setLevel(logging.DEBUG)
+    _l.addHandler(h_err)
+    _l.addHandler(h_file)
+    return _l
 
 
-def log(message: str, timestamp: Optional[datetime] = None):
-    if timestamp is None:
-        timestamp = datetime.now(timezone.utc)
-    print(f"[{log_timestamp(timestamp)}] {message}")
-
-
-def log_exception(message: str, exc: Exception, timestamp: Optional[datetime] = None):
-    if timestamp is None:
-        timestamp = datetime.now()
-    timestamp_str = log_timestamp(timestamp)
-    print(f"[{timestamp_str}] {message}")
-    traceback.print_exception(exc, file=sys.stdout)
+logger: Final[logging.Logger] = _create_logger()
 
 
 def timestamp_url(url: str) -> str:
@@ -58,35 +64,36 @@ _MISSING_KEY: Final[object] = object()
 
 def validate_creator_config(name: str, config: PicartoCreatorConfig,
                             *, indent: str = '') -> bool:
-    log(f'{indent}Validating configuration for creator "{name}":')
+    logger.info('%sValidating configuration for creator "%s":', indent, name)
     success: bool = True
 
     pings = config.get('pings', _MISSING_KEY)
     if pings == _MISSING_KEY:
-        log(f"{indent}Missing required key 'pings'")
+        logger.error("%sMissing required key 'pings'", indent)
         success = False
     elif not isinstance(pings, Sequence):
-        log(f"{indent}Key 'pings' has invalid value (expected 'Sequence', got '{pings!r}')")
+        logger.error("%sKey 'pings' has invalid value (expected 'Sequence', got '%s')",
+                     indent, repr(pings))
         success = False
     else:
         p_indent = indent + '  '
-        log(f'{p_indent}Validating pings:')
+        logger.info("%sValidating pings:", p_indent)
 
         for ping in pings:
             if isinstance(ping, dict):
                 flake = ping.get('role', _MISSING_KEY)
                 if flake != _MISSING_KEY:
                     if not isinstance(flake, str):
-                        log(f"{p_indent}Role ping has invalid snowflake value "
-                            f"(expected 'istrnt', got '{flake!r}')")
+                        logger.error("%sRole ping has invalid snowflake value "
+                                     "(expected 'istrnt', got '%s')", p_indent, repr(flake))
                         success = False
                     continue
 
                 flake = ping.get('user', _MISSING_KEY)
                 if flake != _MISSING_KEY:
                     if not not isinstance(flake, str):
-                        log(f"{p_indent}User ping has invalid snowflake value "
-                            f"(expected 'str', got '{flake!r}')")
+                        logger.error("%sUser ping has invalid snowflake value "
+                                     "(expected 'istrnt', got '%s')", p_indent, repr(flake))
                         success = False
                     continue
 
@@ -96,7 +103,8 @@ def validate_creator_config(name: str, config: PicartoCreatorConfig,
                 elif ping == '@here' or ping == 'here':
                     continue
 
-            log(f"{p_indent}Unrecognized ping '{ping!r}', will be ignored")
+            logger.warning("%sUnrecognized ping '%s', will be ignored",
+                           p_indent, repr(ping))
             # not a failure!
 
     return success
@@ -104,23 +112,25 @@ def validate_creator_config(name: str, config: PicartoCreatorConfig,
 
 def validate_webhook_config(name: str, config: DiscordWebhookConfig,
                             *, indent: str = '') -> bool:
-    log(f'{indent}Validating configuration for webhook "{name}":')
+    logger.info('%sValidating configuration for webhook "%s":', indent, name)
     success: bool = True
 
     url = config.get('url', _MISSING_KEY)
     if url == _MISSING_KEY:
-        log(f"{indent}Missing required key 'url'")
+        logger.error("%sMissing required key 'url'", indent)
         success = False
     elif not isinstance(url, str):
-        log(f"{indent}Key 'url' has invalid value (expected 'str', got '{url!r}')")
+        logger.error("%sKey 'url' has invalid value (expected 'str', got '%s')",
+                     indent, repr(url))
         success = False
     
     creators = config.get('creators', _MISSING_KEY)
     if creators == _MISSING_KEY:
-        log(f"{indent}Missing required key 'creators'")
+        logger.error("%sMissing required key 'creators'", indent)
         success = False
     elif not isinstance(creators, Mapping):
-        log(f"{indent}Key 'creators' has invalid value (expected 'Mapping', got '{creators!r}')")
+        logger.error("%sKey 'creators' has invalid value (expected 'Mapping', got '%s')",
+                     indent, repr(creators))
         success = False
     else:
         c_indent = indent + '  '
@@ -133,31 +143,34 @@ def validate_webhook_config(name: str, config: DiscordWebhookConfig,
 
 def validate_config(config: NotifierConfig,
                     *, indent: str = '') -> bool:
-    log(f'{indent}Validating configuration:')
+    logger.info('%sValidating configuration:', indent)
     success: bool = True
 
     user_agent = config.get('user_agent', _MISSING_KEY)
     if user_agent == _MISSING_KEY:
-        log(f"{indent}Missing required key 'user_agent'")
+        logger.error("%sMissing required key 'user_agent'", indent)
         success = False
     elif not isinstance(user_agent, str):
-        log(f"{indent}Key 'user_agent' has invalid value (expected 'str', got '{user_agent!r}')")
+        logger.error("%sKey 'user_agent' has invalid value (expected 'str', got '%s')",
+                     indent, repr(user_agent))
         success = False
 
     email = config.get('email', _MISSING_KEY)
     if email == _MISSING_KEY:
-        log(f"{indent}Missing required key 'email'")
+        logger.error("%sMissing required key 'email'", indent)
         success = False
     elif not isinstance(email, str):
-        log(f"{indent}Key 'email' has invalid value (expected 'str', got '{email!r}')")
+        logger.error("%sKey 'email' has invalid value (expected 'str', got '%s')",
+                     indent, repr(email))
         success = False
 
     webhooks = config.get('webhooks', _MISSING_KEY)
     if webhooks == _MISSING_KEY:
-        log(f"{indent}Missing required key 'webhooks'")
+        logger.error("%sMissing required key 'webhooks'", indent)
         success = False
     elif not isinstance(webhooks, Mapping):
-        log(f"{indent}Key 'webhooks' has invalid value (expected 'Mapping', got '{webhooks!r}')")
+        logger.error("%sKey 'webhooks' has invalid value (expected 'Mapping', got '%s')",
+                     indent, repr(webhooks))
         success = False
     else:
         w_indent = indent + '  '
@@ -224,7 +237,8 @@ class PicartoCreator:
             ping_list.append('@here')
         ping_list.append(f'{len(self.ping_roles)} role(s)')
         ping_list.append(f'{len(self.ping_users)} user(s)')
-        log(f'{indent}Now pings: {", ".join(ping_list)}')
+
+        logger.debug('%sNow pings: %s', indent, ', '.join(ping_list))
 
     def create_webhook_post_json(self, data: Mapping[str, Any]) -> Mapping[str, Any]:
         if 'name' in data:
@@ -346,10 +360,10 @@ class DiscordWebhook:
             key = c_name.casefold()
 
             if key in self.creators:
-                log(f'{indent}Creator "{c_name}" updated:')
+                logger.debug('%sCreator "%s" updated:', indent, c_name)
                 self.creators[key].update_config(c_name, c_config, indent=c_indent)
             else:
-                log(f'{indent}New creator "{c_name}" added:')
+                logger.debug('%sNew creator "%s" added:', indent, c_name)
                 self.creators[key] = PicartoCreator(c_name, c_config, indent=c_indent)
 
             removed_creators.discard(key)
@@ -357,7 +371,8 @@ class DiscordWebhook:
         for key in removed_creators:
             creator = self.creators.pop(key, None)
             if creator is not None:
-                log(f'{indent}Creator "{creator.name}" removed')
+                logger.debug('%sCreator "%s" removed', indent, creator.name)
+                pass
 
             self.last_notified.pop(key, None)
 
@@ -380,11 +395,12 @@ class DiscordWebhook:
                               json=creator.create_webhook_post_json(c_data),
                               timeout=10).raise_for_status()
                 self.last_notified[c_key] = now
-                log(f'Webhook "{self.name}" sent notification for creator "{creator.name}"')
+                logger.debug('Webhook "%s" sent notification for creator "%s"',
+                             self.name, creator.name)
             except requests.exceptions.RequestException as exc:
-                log_exception(
-                    f'Webhook "{self.name}" failed to send notification for creator "{creator.name}":',
-                    exc)
+                logger.error('Webhook "%s" failed to send notification for creator "%s"',
+                             self.name, creator.name,
+                             exc_info=exc)
                 success = False
 
         return success
@@ -408,13 +424,15 @@ class Notifier:
         self.tracked_creators = {}
 
     def run(self):
-        if not self.update_config():
-            log('Failed to fetch initial configuration')
+        if self.update_config():
+            logger.info('Fetched initial configuration')
+        else:
+            logger.critical('Failed to fetch initial configuration, exiting')
             exit(-1)
 
         while True:
             try:
-                log('Performing check...')
+                logger.debug('Checking for online creators')
 
                 success = True
 
@@ -432,30 +450,35 @@ class Notifier:
                         },
                         timeout=10).json()
                 except requests.exceptions.RequestException as exc:
-                    log_exception('Failed to fetch online creators from Picarto', exc)
+                    logger.error('Failed to fetch online creators from Picarto',
+                                 exc_info=exc)
                     success = False
 
                 if success:
                     if not isinstance(response, Sequence):
-                        log(f"Unexpected API response (expected 'Sequence', got '{response!r}')")
+                        logger.error("Unexpected API response (expected 'Sequence', got '%s')",
+                                     repr(response))
                         success = False
 
                 if success:
                     online_creators = {}
                     for i, data in enumerate(response):
                         if not isinstance(data, Mapping):
-                            log(f"Unexpected API response (expected 'Mapping' at [{i}], got '{data!r}')")
+                            logger.error("Unexpected API response (expected 'str' at [%s].name, got '%s')",
+                                         i, repr(data))
                             success = False
                             continue
 
                         if 'name' not in data:
-                            log(f"Unexpected API response (Mapping at index {i} missing key 'name')")
+                            logger.error("Unexpected API response (Mapping at index %s missing key 'name')",
+                                         i)
                             success = False
                             continue
 
                         creator_name = data.get('name')
                         if not isinstance(creator_name, str):
-                            log(f"Unexpected API response (expected 'str' at [{i}].name, got '{creator_name!r}')")
+                            logger.error("Unexpected API response (expected 'str' at [%s].name, got '%s')",
+                                         i, repr(creator_name))
                             success = False
                             continue
 
@@ -474,24 +497,26 @@ class Notifier:
 
     def update_config(self,
                       *, indent: str = '') -> bool:
-        log(f'{indent}Fetching latest configuration from "{self.config_url}"')
+        logger.info('%sFetching latest configuration from "%s"', indent, self.config_url)
+
         new_config: NotifierConfig
         try:
             new_config = requests.get(self.config_url, timeout=10).json()
         except requests.exceptions.RequestException as exc:
-            log_exception(f'{indent}Failed to fetch latest configuration from "{self.config_url}":', exc)
+            logger.error('%sFailed to fetch latest configuration:', indent,
+                         exc_info=exc)
             self.config_update_interval = CONFIG_UPDATE_INTERVAL_ERROR
             return False
 
         if not validate_config(new_config):
-            log(f'{indent}Latest configuration is invalid, continuing with current configuration')
+            logger.error('%sLatest configuration is invalid, continuing with current configuration', indent)
             self.config_update_interval = CONFIG_UPDATE_INTERVAL_ERROR
             return False
 
         self.config = new_config
         self.last_config_update = datetime.now(timezone.utc)
 
-        log(f'{indent}Applying latest configuration')
+        logger.info('%sApplying latest configuration', indent)
 
         self.user_agent = self.config['user_agent']
         self.email = self.config['email']
@@ -503,10 +528,10 @@ class Notifier:
             key = w_name.casefold()
 
             if key in self.webhooks:
-                log(f'{indent}Webhook "{w_name}" updated:')
+                logger.debug('%sWebhook "%s" updated:', indent, w_name)
                 self.webhooks[key].update_config(w_name, w_config, indent=w_indent)
             else:
-                log(f'{indent}New webhook "{w_name}" added:')
+                logger.debug('%sNew webhook "%s" added:', indent, w_name)
                 self.webhooks[key] = DiscordWebhook(w_name, w_config, indent=w_indent)
 
             removed_webhooks.discard(key)
@@ -514,7 +539,7 @@ class Notifier:
         for key in removed_webhooks:
             webhook = self.webhooks.pop(key, None)
             if webhook is not None:
-                log(f'{indent}Webhook "{webhook.name}" removed')
+                logger.debug('%sWebhook "%s" removed', indent, webhook.name)
 
         self.tracked_creators.clear()
 
@@ -522,7 +547,7 @@ class Notifier:
             for creator_key, creator in webhook.creators.items():
                 self.tracked_creators[creator_key] = creator.name
 
-        log('Latest configuration applied')
+        logger.info('%sLatest configuration applied', indent)
 
         self.config_update_interval = CONFIG_UPDATE_INTERVAL
         return True

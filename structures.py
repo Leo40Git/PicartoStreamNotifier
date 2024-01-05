@@ -1,7 +1,6 @@
-from typing import TypedDict, NewType, Literal, Mapping, Sequence
+from typing import TypedDict, Literal, Mapping, Sequence
 
 __all__ = (
-    'DiscordSnowflake',
     'DiscordEveryonePing',
     'DiscordHerePing',
     'DiscordUserPing',
@@ -12,18 +11,16 @@ __all__ = (
     'NotifierConfig',
 )
 
-DiscordSnowflake = NewType('DiscordSnowflake', int)
-
 DiscordEveryonePing = Literal['@everyone', 'everyone']
 DiscordHerePing = Literal['@here', 'here']
 
 
 class DiscordUserPing(TypedDict):
-    user: DiscordSnowflake
+    user: str
 
 
 class DiscordRolePing(TypedDict):
-    role: DiscordSnowflake
+    role: str
 
 
 DiscordPing = DiscordEveryonePing | DiscordHerePing | DiscordUserPing | DiscordRolePing

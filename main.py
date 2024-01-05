@@ -76,17 +76,17 @@ def validate_creator_config(name: str, config: PicartoCreatorConfig,
             if isinstance(ping, dict):
                 flake = ping.get('role', _MISSING_KEY)
                 if flake != _MISSING_KEY:
-                    if not isinstance(flake, int):
+                    if not isinstance(flake, str):
                         log(f"{p_indent}Role ping has invalid snowflake value "
-                            f"(expected 'int', got '{flake!r}')")
+                            f"(expected 'istrnt', got '{flake!r}')")
                         success = False
                     continue
 
                 flake = ping.get('user', _MISSING_KEY)
                 if flake != _MISSING_KEY:
-                    if not not isinstance(flake, int):
+                    if not not isinstance(flake, str):
                         log(f"{p_indent}User ping has invalid snowflake value "
-                            f"(expected 'int', got '{flake!r}')")
+                            f"(expected 'str', got '{flake!r}')")
                         success = False
                     continue
 
@@ -173,8 +173,8 @@ class PicartoCreator:
     __actual_name: Optional[str]  # as defined by Picarto
     ping_everyone: bool
     ping_here: bool
-    ping_roles: set[DiscordSnowflake]
-    ping_users: set[DiscordSnowflake]
+    ping_roles: set[str]
+    ping_users: set[str]
 
     def __init__(self, name: str, config: PicartoCreatorConfig,
                  *, indent: str = ''):
@@ -248,7 +248,7 @@ class PicartoCreator:
 
         pings.extend([f'<@&{flake}>' for flake in self.ping_roles])
         pings.extend([f'<@{flake}>' for flake in self.ping_users])
-        return ' '.join(pings)
+        return f"{' '.join(pings)} **{self.name}** is now live!"
 
     def _create_allowed_mentions_dict(self) -> dict[str, Any]:
         result: dict[str, Any] = {}
@@ -262,29 +262,25 @@ class PicartoCreator:
             # past that, we must allow all role mentions
             parse.append('roles')
         elif len(self.ping_roles) > 0:
-            result['roles'] = [str(flake) for flake in self.ping_roles]
+            result['roles'] = [flake for flake in self.ping_roles]
 
         if len(self.ping_users) > 100:
             # 'users' array has a maximum length of 100 items
             # past that, we must allow all user mentions
             parse.append('user')
         elif len(self.ping_users) > 0:
-            result['users'] = [str(flake) for flake in self.ping_users]
+            result['users'] = [flake for flake in self.ping_users]
 
         result['parse'] = parse
         return result
 
     def _create_embed_dict(self, data: Mapping[str, Any]) -> Mapping[str, Any]:
         embed: dict[str, Any] = {
+            'title': data.get('title', f"{self.name}'s Picarto Stream"),
             'url': f'https://picarto.tv/{self.name}',
             'color': 0x4C90F3,
             'author': {'name': self.name},
         }
-
-        if 'title' in data:
-            embed['title'] = data['title']
-        else:
-            embed['title'] = f"{self.name}'s Picarto Stream"
 
         fields: list[dict[str, Any]] = []
 

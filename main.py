@@ -1,4 +1,3 @@
-import os
 import sys
 import traceback
 from collections.abc import Sequence, Mapping
@@ -9,9 +8,6 @@ from typing import Final, Optional, cast, Any
 import requests
 
 from structures import *
-
-# name of environment variable that contains the URL to download the config from
-CONFIG_URL_ENV: Final[str] = 'PICARTOSTREAMNOTIFIER_CONFIG_URL'
 
 # interval between each config update
 CONFIG_UPDATE_INTERVAL: Final[timedelta] = timedelta(hours=1)
@@ -410,7 +406,7 @@ class Notifier:
     def run(self):
         if not self.update_config():
             log('Failed to fetch initial configuration')
-            exit(-1)
+            exit(1)
 
         while True:
             try:
@@ -474,7 +470,7 @@ class Notifier:
 
     def update_config(self,
                       *, indent: str = '') -> bool:
-        log(f'{indent}Fetching latest configuration')
+        log(f'{indent}Fetching latest configuration from "{self.config_url}"')
         new_config: NotifierConfig
         try:
             new_config = requests.get(self.config_url, timeout=10).json()
@@ -529,12 +525,9 @@ class Notifier:
 
 
 if __name__ == '__main__':
-    _config_url: str
-    try:
-        _config_url = os.environ[CONFIG_URL_ENV]
-    except KeyError:
-        print(f'Please set environment variable "{CONFIG_URL_ENV}" to the URL of the configuration file')
+    if len(sys.argv) < 2:
+        print(f'usage: main.py <configuration URL>')
         exit(1)
 
-    _notifier = Notifier(_config_url)
+    _notifier = Notifier(sys.argv[1])
     _notifier.run()

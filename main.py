@@ -289,30 +289,26 @@ class PicartoCreator:
         return result
 
     def _create_embed_dict(self, data: Mapping[str, Any]) -> Mapping[str, Any]:
+        image_url: Optional[str] = None
+        thumbnails = data.get('thumbnails')
+        if isinstance(thumbnails, dict):
+            if 'web_large' in thumbnails:
+                image_url = thumbnails['web_large']
+            elif 'web' in thumbnails:
+                image_url = thumbnails['web']
+
         embed: dict[str, Any] = {
-            'title': data.get('title', f"{self.name}'s Picarto Stream"),
+            'title': data.get('title', '(unnamed stream)'),
+            'description': f"Join {data.get('viewers', 0)} other viewers in **{self.name}**'s stream!",
             'url': f'https://picarto.tv/{self.name}',
             'color': 0x4C90F3,
-            'author': {'name': self.name},
         }
-
-        fields: list[dict[str, Any]] = []
-
-        if 'followers' in data:
-            fields.append({'name': 'Followers', 'value': str(data['followers'])})
-
-        if 'views_total' in data:
-            fields.append({'name': 'Total views', 'value': str(data['views_total'])})
-
-        if len(fields) > 0:
-            embed['fields'] = fields
 
         if 'avatar' in data:
             embed['thumbnail'] = {'url': timestamp_url(data['avatar'])}
 
-        tn_data = data.get('thumbnails')
-        if isinstance(tn_data, dict) and 'web' in tn_data:
-            embed['image'] = {'url': timestamp_url(tn_data['web'])}
+        if image_url is not None:
+            embed['image'] = {'url': timestamp_url(image_url)}
 
         footer_parts: list[str] = []
 

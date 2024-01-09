@@ -291,11 +291,9 @@ class PicartoCreator:
     def _create_embed_dict(self, data: Mapping[str, Any]) -> Mapping[str, Any]:
         image_url: Optional[str] = None
         thumbnails = data.get('thumbnails')
-        if isinstance(thumbnails, dict):
-            if 'web_large' in thumbnails:
-                image_url = thumbnails['web_large']
-            elif 'web' in thumbnails:
-                image_url = thumbnails['web']
+        if isinstance(thumbnails, dict) \
+                and 'web' in thumbnails:
+            image_url = thumbnails['web']
 
         embed: dict[str, Any] = {
             'title': data.get('title', '(unnamed stream)'),
@@ -382,7 +380,7 @@ class DiscordWebhook:
                 continue
 
             if c_key in self.last_notified \
-                    and self.last_notified[c_key] - now < NOTIFY_INTERVAL:
+                    and now - self.last_notified[c_key]  < NOTIFY_INTERVAL:
                 continue
 
             creator = self.creators[c_key]
@@ -433,7 +431,7 @@ class Notifier:
                 success = True
 
                 now = datetime.now(timezone.utc)
-                if self.last_config_update - now >= self.config_update_interval:
+                if now - self.last_config_update >= self.config_update_interval:
                     self.update_config()
 
                 response: list[dict[str, Any]] = []

@@ -27,7 +27,7 @@ CHECK_INTERVAL: Final[timedelta] = timedelta(minutes=3)
 CHECK_INTERVAL_ERROR: Final[timedelta] = timedelta(minutes=1)
 
 # interval between each notification being set (per creator, per webhook URL)
-NOTIFY_INTERVAL: Final[timedelta] = timedelta(minutes=30)
+NOTIFY_INTERVAL: Final[timedelta] = timedelta(minutes=15)
 
 
 def _create_logger() -> logging.Logger:
@@ -330,6 +330,8 @@ class DiscordWebhook:
     url: str
     creators: dict[str, PicartoCreator]
 
+    # keys of creators that we know are online
+    online_creators: set[str]
     # last time we pushed a notification for a creator to the webhook
     last_notified: dict[str, datetime]
 
@@ -338,6 +340,7 @@ class DiscordWebhook:
         self.name = name
         self.url = ''
         self.creators = {}
+        self.online_creators = set()
         self.last_notified = {}
         self.update_config(name, config, indent=indent)
 
@@ -347,6 +350,7 @@ class DiscordWebhook:
         self.url = config['url']
 
         removed_creators: set[str] = set(self.creators.keys())
+        removed_creators.update(self.online_creators)
         removed_creators.update(self.last_notified.keys())
 
         c_indent = indent + '  '
@@ -370,17 +374,29 @@ class DiscordWebhook:
 
             self.last_notified.pop(key, None)
 
+        self.online_creators.difference_update(removed_creators)
+
     def notify(self, online_creators: Mapping[str, Mapping[str, Any]]) -> bool:
         success: bool = True
 
         now = datetime.now(timezone.utc)
 
+        # mark every known online creator as offline
+        offline_creators: set[str] = set(self.online_creators)
+
         for c_key, c_data in online_creators.items():
             if c_key not in self.creators:
                 continue
 
+            # remove "creator is now offline" mark
+            offline_creators.discard(c_key)
+
+            # if creator was already online, don't try to ping again
+            if c_key in self.online_creators:
+                continue
+
             if c_key in self.last_notified \
-                    and now - self.last_notified[c_key]  < NOTIFY_INTERVAL:
+                    and now - self.last_notified[c_key] < NOTIFY_INTERVAL:
                 continue
 
             creator = self.creators[c_key]
@@ -388,6 +404,8 @@ class DiscordWebhook:
                 requests.post(self.url,
                               json=creator.create_webhook_post_json(c_data),
                               timeout=10).raise_for_status()
+                # mark creator as online
+                self.online_creators.add(c_key)
                 self.last_notified[c_key] = now
                 logger.debug('Webhook "%s" sent notification for creator "%s"',
                              self.name, creator.name)
@@ -396,6 +414,9 @@ class DiscordWebhook:
                              self.name, creator.name,
                              exc_info=exc)
                 success = False
+
+        # remove creators we marked as offline from the online creators set
+        self.online_creators.difference_update(offline_creators)
 
         return success
 

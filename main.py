@@ -55,7 +55,10 @@ logger: Final[logging.Logger] = _create_logger()
 
 def timestamp_url(url: str) -> str:
     timestamp = datetime.now(timezone.utc).strftime('%Y%m%d%H%M')
-    return f'{url}?_t={timestamp}'
+    try:
+        return str(httpx.URL(url, params={'_timestamp': timestamp}))
+    except httpx.InvalidURL:
+        return f'{url}&_timestamp={timestamp}' if '?' in url else f'{url}?_timestamp={timestamp}'
 
 
 # used for dict.get(key, default) calls to represent missing keys

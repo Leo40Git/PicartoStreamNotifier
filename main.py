@@ -7,7 +7,7 @@ from datetime import datetime, timezone, timedelta
 from time import sleep
 from typing import Final, Optional, cast, Any
 
-import requests
+import httpx
 
 from structures import *
 
@@ -123,7 +123,7 @@ def validate_webhook_config(name: str, config: DiscordWebhookConfig,
         logger.error("%sKey 'url' has invalid value (expected 'str', got '%s')",
                      indent, repr(url))
         success = False
-    
+
     creators = config.get('creators', _MISSING_KEY)
     if creators == _MISSING_KEY:
         logger.error("%sMissing required key 'creators'", indent)
@@ -182,7 +182,7 @@ def validate_config(config: NotifierConfig,
 
 
 class PicartoCreator:
-    __name: str                   # as defined by configuration
+    __name: str  # as defined by configuration
     __actual_name: Optional[str]  # as defined by Picarto
     ping_everyone: bool
     ping_here: bool
@@ -401,15 +401,15 @@ class DiscordWebhook:
 
             creator = self.creators[c_key]
             try:
-                requests.post(self.url,
-                              json=creator.create_webhook_post_json(c_data),
-                              timeout=10).raise_for_status()
+                httpx.post(self.url,
+                           json=creator.create_webhook_post_json(c_data),
+                           timeout=10).raise_for_status()
                 # mark creator as online
                 self.online_creators.add(c_key)
                 self.last_notified[c_key] = now
                 logger.debug('Webhook "%s" sent notification for creator "%s"',
                              self.name, creator.name)
-            except requests.exceptions.RequestException as exc:
+            except httpx.HTTPError as exc:
                 logger.error('Webhook "%s" failed to send notification for creator "%s"',
                              self.name, creator.name,
                              exc_info=exc)
@@ -457,14 +457,14 @@ class Notifier:
 
                 response: list[dict[str, Any]] = []
                 try:
-                    response = requests.get(
+                    response = httpx.get(
                         'https://api.picarto.tv/api/v1/online?adult=true&gaming=true',
                         headers={
                             'User-Agent': self.user_agent,
                             'From': self.email
                         },
                         timeout=10).json()
-                except requests.exceptions.RequestException as exc:
+                except httpx.HTTPError as exc:
                     logger.error('Failed to fetch online creators from Picarto',
                                  exc_info=exc)
                     success = False
@@ -516,8 +516,8 @@ class Notifier:
 
         new_config: NotifierConfig
         try:
-            new_config = requests.get(self.config_url, timeout=10).json()
-        except requests.exceptions.RequestException as exc:
+            new_config = httpx.get(self.config_url, timeout=10).json()
+        except httpx.HTTPError as exc:
             logger.error('%sFailed to fetch latest configuration:', indent,
                          exc_info=exc)
             self.config_update_interval = CONFIG_UPDATE_INTERVAL_ERROR

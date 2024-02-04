@@ -5,14 +5,36 @@ import sys
 from collections.abc import Sequence, Mapping
 from datetime import datetime, timezone, timedelta
 from time import sleep
-from typing import Final, Optional, cast, Any
+from typing import Final, cast, Any
 
 import httpx
+import strictyaml
+from strictyaml import Map, MapPattern, Str, Url, Email, Seq, Enum
 
 from structures import *
 
 # name of environment variable that contains the URL to download the config from
 CONFIG_URL_ENV: Final[str] = 'PICARTOSTREAMNOTIFIER_CONFIG_URL'
+
+# StrictYAML schema for config
+_CONFIG_SCHEMA_DISCORD_PING_USER = Map({'user': Str()})
+_CONFIG_SCHEMA_DISCORD_PING_ROLE = Map({'role': Str()})
+_CONFIG_SCHEMA_DISCORD_PING_FIRST_PASS = (Enum(['everyone', '@everyone', 'here', '@here'])
+                                          | MapPattern(Str(), Str(),
+                                                       minimum_keys=1,
+                                                       maximum_keys=1))
+_CONFIG_SCHEMA_PICARTO_CREATOR = Map({
+    'pings': Seq(_CONFIG_SCHEMA_DISCORD_PING_FIRST_PASS)
+})
+_CONFIG_SCHEMA_DISCORD_WEBHOOK = Map({
+    'url': Url(),
+    'creators': MapPattern(Str(), _CONFIG_SCHEMA_PICARTO_CREATOR)
+})
+CONFIG_SCHEMA: Final[Map] = Map({
+    'user_agent': Str(),
+    'email': Email(),
+    'webhooks': MapPattern(Str(), _CONFIG_SCHEMA_DISCORD_WEBHOOK)
+})
 
 # interval between each config update
 CONFIG_UPDATE_INTERVAL: Final[timedelta] = timedelta(hours=1)
@@ -30,6 +52,7 @@ CHECK_INTERVAL_ERROR: Final[timedelta] = timedelta(minutes=1)
 NOTIFY_INTERVAL: Final[timedelta] = timedelta(minutes=15)
 
 
+# TODO use logging.config.dictConfig instead
 def _create_logger() -> logging.Logger:
     fmt = logging.Formatter('[{asctime}] [{levelname:8}] {message}',
                             datefmt='%m/%d/%Y %H:%M',
@@ -186,7 +209,7 @@ def validate_config(config: NotifierConfig,
 
 class PicartoCreator:
     __name: str  # as defined by configuration
-    __actual_name: Optional[str]  # as defined by Picarto
+    __actual_name: str | None  # as defined by Picarto
     ping_everyone: bool
     ping_here: bool
     ping_roles: set[str]
@@ -292,7 +315,7 @@ class PicartoCreator:
         return result
 
     def _create_embed_dict(self, data: Mapping[str, Any]) -> Mapping[str, Any]:
-        image_url: Optional[str] = None
+        image_url: str | None = None
         thumbnails = data.get('thumbnails')
         if isinstance(thumbnails, dict) \
                 and 'web' in thumbnails:
@@ -526,10 +549,13 @@ class Notifier:
             self.config_update_interval = CONFIG_UPDATE_INTERVAL_ERROR
             return False
 
-        if not validate_config(new_config):
-            logger.error('%sLatest configuration is invalid, continuing with current configuration', indent)
-            self.config_update_interval = CONFIG_UPDATE_INTERVAL_ERROR
-            return False
+        # if not validate_config(new_config):
+        #     logger.error('%sLatest configuration is invalid, continuing with current configuration', indent)
+        #     self.config_update_interval = CONFIG_UPDATE_INTERVAL_ERROR
+        #     return False
+
+        new_config_yaml = strictyaml.as_document(new_config, CONFIG_SCHEMA)
+        print(new_config_yaml.as_yaml())
 
         self.config = new_config
         self.last_config_update = datetime.now(timezone.utc)
@@ -568,7 +594,8 @@ class Notifier:
         logger.info('%sLatest configuration applied', indent)
 
         self.config_update_interval = CONFIG_UPDATE_INTERVAL
-        return True
+        # return True
+        return False
 
 
 if __name__ == '__main__':

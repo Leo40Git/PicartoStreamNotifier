@@ -85,7 +85,7 @@ def validate_creator_config(name: str, config: PicartoCreatorConfig,
                 if flake != _MISSING_KEY:
                     if not isinstance(flake, str):
                         logger.error("%sRole ping has invalid snowflake value "
-                                     "(expected 'istrnt', got '%s')", p_indent, repr(flake))
+                                     "(expected 'str', got '%s')", p_indent, repr(flake))
                         success = False
                     continue
 
@@ -93,7 +93,7 @@ def validate_creator_config(name: str, config: PicartoCreatorConfig,
                 if flake != _MISSING_KEY:
                     if not not isinstance(flake, str):
                         logger.error("%sUser ping has invalid snowflake value "
-                                     "(expected 'istrnt', got '%s')", p_indent, repr(flake))
+                                     "(expected 'str', got '%s')", p_indent, repr(flake))
                         success = False
                     continue
 
@@ -479,7 +479,7 @@ class Notifier:
                     online_creators = {}
                     for i, data in enumerate(response):
                         if not isinstance(data, Mapping):
-                            logger.error("Unexpected API response (expected 'str' at [%s].name, got '%s')",
+                            logger.error("Unexpected API response (expected 'Mapping' at [%s], got '%s')",
                                          i, repr(data))
                             success = False
                             continue

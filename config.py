@@ -1,11 +1,13 @@
-import datetime
+from datetime import timedelta
 from enum import StrEnum, auto
 from typing import Final
 
-from strictyaml import Map, Str, Email, Url, MapPattern, Optional, Enum, UniqueSeq, Seq, Bool
+from strictyaml import Map, Str, Url, Optional, Enum, UniqueSeq, Seq, Bool
 
 __all__ = (
-    'FALLBACK_LOG_WEBHOOK_URL_ENV',
+    'USER_AGENT_ENV',
+    'EMAIL_ENV',
+    'LOG_WEBHOOK_URL_ENV',
     'CONFIG_URL_ENV',
     'StreamPlatform',
     'DEFAULT_STREAM_PLATFORM',
@@ -17,14 +19,22 @@ __all__ = (
     'NOTIFY_INTERVAL',
 )
 
-# name of environment variable that contains the fallback Discord webhook URL
-#  to log errors to, in case initial config loading fails
-FALLBACK_LOG_WEBHOOK_URL_ENV: Final[str] \
-    = 'PSN_FALLBACK_LOG_WEBHOOK_URL'
+# prefix for environment variable names
+ENV_PREFIX: Final[str] = 'STREAMNOTIF_'
+
+# name of environment variable that contains the user agent to specify
+#  in the 'User-Agent' header of HTTP requests made by the script
+USER_AGENT_ENV: Final[str] = ENV_PREFIX + 'USER_AGENT'
+
+# name of environment variable that contains the E-mail to specify
+#  in the 'From' header of HTTP request made by the script
+EMAIL_ENV: Final[str] = ENV_PREFIX + 'EMAIL'
+
+# name of environment variable that contains a Discord webhook URL to log errors to
+LOG_WEBHOOK_URL_ENV: Final[str] = ENV_PREFIX + 'LOG_WEBHOOK_URL'
 
 # name of environment variable that contains the URL to download the config from
-CONFIG_URL_ENV: Final[str] \
-    = 'PSN_CONFIG_URL'
+CONFIG_URL_ENV: Final[str] = ENV_PREFIX + 'CONFIG_URL'
 
 # supported streaming platforms
 class StreamPlatform(StrEnum):
@@ -39,46 +49,38 @@ def _define_config_schema() -> Map:
     platform_enum = Enum([str(x) for x in StreamPlatform])
 
     return Map({
-        'user_agent': Str(),
-        'email': Email(),
-        'log_webhook': Url(),
         Optional('default_platform', default=str(DEFAULT_STREAM_PLATFORM)): platform_enum,
         Optional('platforms'): Map({
-            'piczel_api_key': Optional(Str()),
+            Optional('piczel_api_key'): Str(),
         }),
         'webhooks': Seq(Map({
             'name': Str(),
             'url': Url(),
-            'creators': Seq(Map({
-                'name': Str(),
+            'streams': Seq(Map({
                 Optional('platform'): platform_enum,
+                'handle': Str(),
                 Optional('ping_users'): UniqueSeq(Str()),
                 Optional('ping_roles'): UniqueSeq(Str()),
                 Optional('ping_everyone', default=False): Bool(),
-                Optional('ping_here', default=False): Bool(),
-            })),
-        })),
+                Optional('ping_here', default=False): Bool()
+            }))
+        }))
     })
 
 # StrictYAML schema for the config
 CONFIG_SCHEMA: Final[Map] = _define_config_schema()
 
 # interval between each config update
-CONFIG_UPDATE_INTERVAL: Final[datetime.timedelta] \
-    = datetime.timedelta(hours=1)
+CONFIG_UPDATE_INTERVAL: Final[timedelta] = timedelta(hours=1)
 
 # alternate value for CONFIG_UPDATE_INTERVAL, used if the last update encountered any errors
-CONFIG_UPDATE_INTERVAL_ERROR: Final[datetime.timedelta] \
-    = datetime.timedelta(minutes=5)
+CONFIG_UPDATE_INTERVAL_ERROR: Final[timedelta] = timedelta(minutes=5)
 
 # interval between each check (keep this above 3 minutes!)
-CHECK_INTERVAL: Final[datetime.timedelta] \
-    = datetime.timedelta(minutes=3)
+CHECK_INTERVAL: Final[timedelta] = timedelta(minutes=3)
 
 # alternate value for CHECK_INTERVAL, used if the last check encountered any errors
-CHECK_INTERVAL_ERROR: Final[datetime.timedelta] \
-    = datetime.timedelta(minutes=1)
+CHECK_INTERVAL_ERROR: Final[timedelta] = timedelta(minutes=1)
 
 # interval between each notification being set (per creator, per webhook URL)
-NOTIFY_INTERVAL: Final[datetime.timedelta] \
-    = datetime.timedelta(minutes=15)
+NOTIFY_INTERVAL: Final[timedelta] = timedelta(minutes=15)

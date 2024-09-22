@@ -1,15 +1,15 @@
 from datetime import timedelta
-from enum import StrEnum, auto
 from typing import Final
 
 from strictyaml import Map, Str, Url, Optional, Enum, UniqueSeq, Seq, Bool
+
+from streams import StreamPlatform
 
 __all__ = (
     'USER_AGENT_ENV',
     'EMAIL_ENV',
     'LOG_WEBHOOK_URL_ENV',
     'CONFIG_URL_ENV',
-    'StreamPlatform',
     'DEFAULT_STREAM_PLATFORM',
     'CONFIG_SCHEMA',
     'CONFIG_UPDATE_INTERVAL',
@@ -35,11 +35,6 @@ LOG_WEBHOOK_URL_ENV: Final[str] = ENV_PREFIX + 'LOG_WEBHOOK_URL'
 
 # name of environment variable that contains the URL to download the config from
 CONFIG_URL_ENV: Final[str] = ENV_PREFIX + 'CONFIG_URL'
-
-# supported streaming platforms
-class StreamPlatform(StrEnum):
-    PICARTO = auto()
-    PICZEL = auto()
 
 # default streaming platform
 DEFAULT_STREAM_PLATFORM: Final[StreamPlatform] \
